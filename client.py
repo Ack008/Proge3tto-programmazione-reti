@@ -1,57 +1,69 @@
 import socket as sk
 import time
 import threading
-global ack_received
-global num_starting_send 
-global timeout
-global WINDOW_LENGHT
-global ack
-WINDOW_LENGHT = 5
 
-def receive(sock):
-    while True:
-        data, server = sock.recvfrom(4096)
-        num =int(data[0])
-        ack[num % WINDOW_LENGHT] = True
-        # print(ack)
-def timer():
-    while True:
-        if timeout >= 0.0:
+WINDOW_LENGTH = 5
+
+class SlidingWindow:
+    def __init__(self):
+        self.window_begin = 0
+        self.window_pos = 0
+        self.timeout = 10.0
+        self.timer_lock = threading.Lock()
+        self.window_lock = threading.Lock()
+
+    def receive(self, sock):
+        while self.window_begin <= self.lenght:
+            data, server = sock.recvfrom(4096)
+            num = int(data.decode().split(" ")[0])
+            print(f"Received: Ack {num}")
+            with self.window_lock:
+                self.window_begin += 1
+
+    def timer(self):
+        while self.window_begin <= self.lenght:
             time.sleep(1)
-            timeout -= 1
-        
+            with self.timer_lock:
+                if self.timeout > 0:
+                    self.timeout -= 1.0
+    def start_threads(self):
+        self.receiving_thread = threading.Thread(target=sw.receive, args=(sock,))
+        self.timer_thread = threading.Thread(target=sw.timer)
+        self.receiving_thread.start()
+        self.timer_thread.start()
+    def wait_threads(self):
+        self.timer_thread.join()
+        self.receiving_thread.join()
 
-
-# Create il socket UDP
+    def send_packets(self, sock, server_address,messageLen):
+        self.lenght = messageLen
+        self.start_threads()
+        while self.window_begin <= self.lenght:
+            if self.timeout <= 0.0:
+                with self.timer_lock:
+                    self.timeout = 10.0
+                    self.window_pos = self.window_begin # Reset window_pos after timeout
+            elif self.timeout > 0 and self.window_pos <= self.window_begin + WINDOW_LENGTH:
+                message = f"{self.window_pos} byte"
+                print(f"Sending: {self.window_pos} byte: windows_begin: {self.window_begin}")
+                sock.sendto(message.encode(), server_address)
+                self.window_pos += 1
+                with self.timer_lock:
+                    self.timeout = 10.0
+                time.sleep(1)
+            else:
+                print("timer : ",self.timeout)
+                time.sleep(1)
+        sock.sendto("_".encode(), server_address)
+        self.wait_threads()
+# Initialize socket and threads
 sock = sk.socket(sk.AF_INET, sk.SOCK_DGRAM)
-
 server_address = ('localhost', 10000)
-num_starting_send = 0
-ack_received = -1
-timeout = 10.0
-print("start")
-receiving_thread = threading.Thread(target = receive,args= (sock,))
-timer_thread = threading.Thread(target = timer)
-ack = [True for i in range(WINDOW_LENGHT)]
-timer_thread.start()
-receiving_thread.start()
-first = True
-while True:
-    if first and num_starting_send == 3:
-        first = False
-        num_starting_send += 1
-    while timeout <= 0.0 or not ack[num_starting_send % WINDOW_LENGHT]:
-        message = f"{num_starting_send % WINDOW_LENGHT}packet"
-        print("invio ",num_starting_send)
-        sock.sendto(message.encode(),server_address)
-    
-    if timeout > 0 :
-        message = f"{num_starting_send % WINDOW_LENGHT}packet"
-        print("invio ",num_starting_send)
-        sock.sendto(message.encode(),server_address)
-        time.sleep(1)
-        ack[num_starting_send % WINDOW_LENGHT] = False
-        num_starting_send += 1
-    else:
-        timeout = 10.0
-        
+
+sw = SlidingWindow()
+
+# Start threads for receiving and timer
+
+
+# Start sending packets
+sw.send_packets(sock, server_address,30)

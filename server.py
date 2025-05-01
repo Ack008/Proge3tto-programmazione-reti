@@ -6,8 +6,7 @@ G.Pau - A. Piroddi
 
 import socket as sk
 import time
-import queue
-WINDOW_LENGHT = 5
+import random as rd
 # Creiamo il socket
 sock = sk.socket(sk.AF_INET, sk.SOCK_DGRAM)
 
@@ -16,18 +15,25 @@ server_address = ('localhost', 10000)
 print ('\n\r starting up on %s port %s' % server_address)
 
 sock.bind(server_address)
-window_pos = 0
-fiirst=True
+num_last_packet = -1
+first_time=True
 while True:
     print('\n\r waiting to receive message...')
     data, address = sock.recvfrom(4096)
-    print('received %s bytes from %s' % (len(data), address))
-    reck = data.decode() 
-    num = int(reck[0])  % WINDOW_LENGHT
-    print(f"{num} e {window_pos}")
-    window_pos = (window_pos + 1) % WINDOW_LENGHT
-    ack=f"{num}"
-    time.sleep(1)
-    sent = sock.sendto(ack.encode(), address)
-    print ('sent %s bytes back to %s' % (sent, address))
-
+    if(data.decode() == "_"):
+        num_last_packet = - 1
+        continue
+    fails = rd.randint(0,16)
+    reck = data.decode().split(" ")[0] 
+    num = int(reck)
+    if not(first_time and num == 30):
+        print('received %s bytes from %s' % (1, address))
+        print(f"{num} e {num_last_packet}")
+        if num == num_last_packet + 1:
+            num_last_packet += 1
+            ack=f"{num}"
+            sent = sock.sendto(ack.encode(), address)
+            print ('sent %s bytes back to %s' % (sent, address))
+    else:
+        first_time = False
+        print(f"{num} not received")
