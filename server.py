@@ -18,22 +18,21 @@ sock.bind(server_address)
 num_last_packet = -1
 first_time=True
 while True:
-    print('\n\r waiting to receive message...')
     data, address = sock.recvfrom(4096)
     if(data.decode() == "_"):
         num_last_packet = - 1
         continue
-    fails = rd.randint(0,16)
+    print('\n\r waiting to receive message...')
+    fails = rd.randint(0,10)
     reck = data.decode().split(" ")[0] 
     num = int(reck)
-    if not(first_time and num == 30):
+    if fails != 0:
         print('received %s bytes from %s' % (1, address))
-        print(f"{num} e {num_last_packet}")
+        print(f"received {num}th packet-last packet_received{num_last_packet}")
         if num == num_last_packet + 1:
             num_last_packet += 1
             ack=f"{num}"
             sent = sock.sendto(ack.encode(), address)
             print ('sent %s bytes back to %s' % (sent, address))
     else:
-        first_time = False
         print(f"{num} not received")
