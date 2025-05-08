@@ -47,11 +47,12 @@ class SlidingWindow:
                 with self.timer_lock:
                     self.timeout = 10.0
                     self.window_pos = self.window_begin # Reset window_pos after timeout
-            elif self.timeout > 0 and self.window_pos <= self.window_begin + WINDOW_LENGTH and self.window_begin <= self.lenght:
+            elif self.timeout > 0 and self.window_pos <= self.window_begin + WINDOW_LENGTH:
                 message = f"{self.window_pos} byte"
                 print(f"Sending: {self.window_pos}th packet: windows_begin: {self.window_begin}")
                 sock.sendto(message.encode(), server_address)
-                self.window_pos += 1
+                if self.window_begin <= self.lenght:
+                    self.window_pos += 1
                 with self.timer_lock:
                     self.timeout = 10.0
                 time.sleep(1)
