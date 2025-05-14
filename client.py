@@ -6,6 +6,7 @@ WINDOW_LENGTH = 5
 
 class SlidingWindow:
     def __init__(self):
+        self.terminateAck = False
         self.inizialize_var()
         self.timer_lock = threading.Lock()
         self.window_lock = threading.Lock()
@@ -14,15 +15,18 @@ class SlidingWindow:
         self.window_pos = 0
         self.timeout = 10.0
     def receive(self, sock):
-        while self.window_begin <= self.lenght:
+        while self.window_begin <= self.lenght or not self.terminateAck:
             data, server = sock.recvfrom(4096)
-            num = int(data.decode().split(" ")[0])
-            print(f"Received: Ack {num}")
-            with self.window_lock:
-                self.window_begin += 1
+            if data.decode() == "_":
+                self.terminateAck = True
+            else:
+                num = int(data.decode().split(" ")[0])
+                print(f"Received: Ack {num}")
+                with self.window_lock:
+                    self.window_begin += 1
 
     def timer(self):
-        while self.window_begin <= self.lenght:
+        while self.window_begin <= self.lenght or not self.terminateAck:
             time.sleep(1)
             with self.timer_lock:
                 if self.timeout > 0:
@@ -35,12 +39,11 @@ class SlidingWindow:
     def wait_threads(self):
         self.timer_thread.join()
         self.receiving_thread.join()
-
     def send_packets(self, sock, server_address,messageLen):
         self.inizialize_var()
         self.lenght = messageLen
         self.start_threads()
-        print(f"Beginning of trasmission : window_begin:{self.window_begin} packets: {self.lenght}")
+        print(f"Beginning of a new trasmission : window_begin:{self.window_begin} packets: {self.lenght}")
         print(f"windows_lenght: {WINDOW_LENGTH}")
         while self.window_begin <= self.lenght:
             if self.timeout <= 0.0:
@@ -60,6 +63,17 @@ class SlidingWindow:
                 print("timer : ",self.timeout)
                 time.sleep(1)
         sock.sendto("_".encode(), server_address)
+        while not self.terminateAck:
+            if self.timeout <= 0.0:
+                with self.timer_lock:
+                    self.timeout = 10.0
+                    self.window_pos = self.window_begin # Reset window_pos after timeout 
+                sock.sendto("_".encode(), server_address)
+            else:
+                print("timer : ",self.timeout)
+                time.sleep(1)
+        print("Transmission ended\n")
+                
         self.wait_threads()
 # Initialize socket and threads
 sock = sk.socket(sk.AF_INET, sk.SOCK_DGRAM)

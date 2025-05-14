@@ -19,11 +19,14 @@ num_last_packet = -1
 first_time=True
 while True:
     data, address = sock.recvfrom(4096)
+    fails = rd.randint(0,10)
     if(data.decode() == "_"):
         num_last_packet = - 1
+        if fails != 0:
+            sent = sock.sendto("_".encode(), address)
+            print("terminator signale received and transmitted")
         continue
     print('\n\r waiting to receive message...')
-    fails = rd.randint(0,10)
     reck = data.decode().split(" ")[0] 
     num = int(reck)
     if fails != 0:
